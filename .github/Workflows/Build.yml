@@ -1,7 +1,11 @@
+
 name: Build Fisch Macro APK
 
-on:
+"on":
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -9,40 +13,52 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Download repository
+        uses: actions/checkout@v4
 
-      - name: Unpack the project
+      - name: Check and unpack project
         run: |
-          mkdir proj
+          test -f FischMacro.zip || {
+            echo "ERROR: FischMacro.zip was not found in the repository root."
+            exit 1
+          }
+          mkdir -p proj
           unzip -q FischMacro.zip -d proj
-          ls proj
+          ls -la proj
 
-      - uses: actions/setup-java@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Build the APK
+      - name: Build APK
         working-directory: proj
         run: gradle --no-daemon :app:assembleDebug
 
-      - name: Name the APK
-        run: cp proj/app/build/outputs/apk/debug/app-debug.apk FischMacro.apk
+      - name: Verify and name APK
+        run: |
+          test -f proj/app/build/outputs/apk/debug/app-debug.apk
+          cp proj/app/build/outputs/apk/debug/app-debug.apk FischMacro.apk
+          ls -lh FischMacro.apk
 
-      - name: Keep a copy as a build artifact
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: FischMacro-apk
           path: FischMacro.apk
 
-      - name: Publish a release with the APK (easiest to download on a phone)
+      - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
