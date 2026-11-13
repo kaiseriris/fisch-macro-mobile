@@ -1,1 +1,66 @@
 
+name: Build Fisch Macro APK
+
+"on":
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download repository
+        uses: actions/checkout@v4
+
+      - name: Check and unpack project
+        run: |
+          test -f FischMacro.zip || {
+            echo "ERROR: FischMacro.zip was not found in the repository root."
+            exit 1
+          }
+          mkdir -p proj
+          unzip -q FischMacro.zip -d proj
+          ls -la proj
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build APK
+        working-directory: proj
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Verify and name APK
+        run: |
+          test -f proj/app/build/outputs/apk/debug/app-debug.apk
+          cp proj/app/build/outputs/apk/debug/app-debug.apk FischMacro.apk
+          ls -lh FischMacro.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FischMacro-apk
+          path: FischMacro.apk
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Fisch Macro build ${{ github.run_number }}
+          files: FischMacro.apk
